@@ -3,7 +3,7 @@ LLM QA test-case generation with Pydantic validation, bounded retries,
 NoSQL (MongoDB) persistence with documented JSON fallback, and staleness detection.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 import difflib
 import json
 import logging
@@ -119,7 +119,7 @@ class NoSQLStorage:
 
     def save_generation(self, record: Dict[str, Any]) -> str:
         record["storage_backend"] = self.backend_type
-        record["created_at"] = record.get("created_at") or datetime.utcnow().isoformat()
+        record["created_at"] = record.get("created_at") or datetime.now(timezone.utc).isoformat()
 
         if self.db is not None:
             try:
@@ -268,7 +268,7 @@ class QAGeneratorService:
             "source_nodes": source_nodes,
             "test_cases": [tc.model_dump() for tc in generation_output.test_cases],
             "model": self.model,
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
 
         storage.save_generation(record)

@@ -2,13 +2,18 @@
 SQLAlchemy ORM models for versioned document hierarchy and named selections.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 from typing import Any, Dict, List, Optional
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import backref, relationship
 
 from app.database import Base
+
+
+def utc_now() -> datetime:
+    """Returns current datetime in UTC timezone."""
+    return datetime.now(timezone.utc)
 
 
 class DocumentVersion(Base):
@@ -22,7 +27,7 @@ class DocumentVersion(Base):
     page_count = Column(Integer, default=0)
     title = Column(String(255), nullable=False)
     metadata_json = Column(Text, default="{}")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     nodes = relationship(
         "DocumentNode",
@@ -103,7 +108,7 @@ class Selection(Base):
 
     id = Column(String(64), primary_key=True)
     name = Column(String(255), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     pinned_nodes = relationship(
         "SelectionNode",
