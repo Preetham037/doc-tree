@@ -59,13 +59,11 @@ Copy the sample `.env.example` file to `.env`:
 cp .env.example .env
 ```
 
-Here is what's inside `.env`:
-
 ```env
 # Database
 DATABASE_URL=sqlite:///./doc_tree.db
 
-# MongoDB (falls back to local JSON file if not running)
+# MongoDB Configuration
 MONGODB_URI=mongodb://localhost:27017
 MONGODB_DB_NAME=doc_tree_qa
 
@@ -74,15 +72,31 @@ GROQ_API_KEY=
 GROQ_MODEL=llama-3.3-70b-versatile
 ```
 
-> **Tip**: You don't need a paid API key to run tests or test the API locally! If `GROQ_API_KEY` is blank, the app runs in deterministic mock mode. If you have a Groq key, just paste it after `GROQ_API_KEY=` to enable live LLM generation.
+> **Tip**: You don't need a paid API key to run tests or test the API locally! If `GROQ_API_KEY` is blank, the app runs in deterministic mock mode. If you have a Groq key, just paste it after `GROQ_API_KEY=` to enable live LLM generation. The application automatically loads `.env` at startup using `python-dotenv`.
 
-### 5. (Optional) Start MongoDB
+### 5. MongoDB Setup & Verification
 
-If you have MongoDB installed (e.g. via Homebrew):
+The application is pre-configured to connect to MongoDB at `mongodb://localhost:27017` and save generated test cases into the `test_cases` collection of the `doc_tree_qa` database.
+
+#### Start MongoDB:
 ```bash
+# On macOS via Homebrew:
 brew services start mongodb-community
 ```
-If you don't run MongoDB, don't worry—the system automatically logs a note and writes generated cases to `data/generated_cases_fallback.json`.
+
+#### Confirm MongoDB is Running:
+```bash
+mongosh --eval 'db.runCommand({ ping: 1 })'
+# Expected output: { ok: 1 }
+```
+
+#### How Storage & Fallback Work:
+- **MongoDB Preferred**: When MongoDB is running, all generated QA test cases are saved directly into the `doc_tree_qa.test_cases` collection. The API response will report `"storage_backend": "mongodb"`.
+- **Inspecting Saved Test Cases in MongoDB**:
+  ```bash
+  mongosh doc_tree_qa --eval 'db.test_cases.find({}, {_id: 0, generation_id: 1, selection_id: 1, storage_backend: 1}).pretty()'
+  ```
+- **Automatic JSON Fallback**: If MongoDB is stopped or unreachable, the application automatically catches the connection timeout, writes to an atomic local file at `data/generated_cases_fallback.json`, and reports `"storage_backend": "json_fallback"`. As soon as MongoDB is started again, the system automatically reconnects on the next request without requiring a server restart.
 
 ---
 

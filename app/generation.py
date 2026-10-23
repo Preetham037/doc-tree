@@ -113,17 +113,25 @@ class NoSQLStorage:
             self.client = None
             self.db = None
 
+    def get_database(self):
+        if self.db is None:
+            self._init_connection()
+        return self.db
+
     @property
     def backend_type(self) -> str:
-        return "mongodb" if self.db is not None else "json_fallback"
+        db = self.get_database()
+        return "mongodb" if db is not None else "json_fallback"
 
     def save_generation(self, record: Dict[str, Any]) -> str:
         record["storage_backend"] = self.backend_type
         record["created_at"] = record.get("created_at") or datetime.now(timezone.utc).isoformat()
 
-        if self.db is not None:
+        db = self.get_database()
+        if db is not None:
             try:
-                self.db.test_cases.insert_one(record)
+                doc_to_insert = record.copy()
+                db.test_cases.insert_one(doc_to_insert)
                 return record["generation_id"]
             except Exception as e:
                 logger.error(f"MongoDB write failed ({e}); switching to JSON fallback")
@@ -146,9 +154,10 @@ class NoSQLStorage:
         return record["generation_id"]
 
     def find_generation_by_selection(self, selection_id: str) -> Optional[Dict[str, Any]]:
-        if self.db is not None:
+        db = self.get_database()
+        if db is not None:
             try:
-                doc = self.db.test_cases.find_one({"selection_id": selection_id}, {"_id": 0})
+                doc = db.test_cases.find_one({"selection_id": selection_id}, {"_id": 0})
                 if doc:
                     return doc
             except Exception:
@@ -173,7 +182,8 @@ class NoSQLStorage:
         generation_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         results = []
-        if self.db is not None:
+        db = self.get_database()
+        if db is not None:
             try:
                 query: Dict[str, Any] = {}
                 if generation_id:
@@ -183,7 +193,7 @@ class NoSQLStorage:
                 if node_id:
                     query["source_nodes.node_id"] = node_id
 
-                cursor = self.db.test_cases.find(query, {"_id": 0})
+                cursor = db.test_cases.find(query, {"_id": 0})
                 results = list(cursor)
                 if results:
                     return results
