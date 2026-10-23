@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+pydantic
+pymupdf
+python-multipart
+python-dotenv
+httpx
+pytest
+pymongo
