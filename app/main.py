@@ -563,3 +563,100 @@ def get_selection(
             for p in selection.pinned_nodes
         ],
     )
+
+
+# --- LLM QA GENERATION & STALENESS APIS ---
+
+from pydantic import BaseModel as PyBaseModel
+
+
+class GenerateRequest(PyBaseModel):
+    selection_id: str
+    force_regenerate: bool = False
+
+
+from app.generation import (
+    GenerationRetrievalResponse,
+    QAGeneratorService,
+    evaluate_staleness,
+    storage,
+)
+
+
+@app.post("/generate", summary="Generate 3-5 validated QA test cases for a named selection")
+def generate_qa_test_cases(
+    payload: GenerateRequest,
+    mock_mode: bool = Query(False, description="Use deterministic mock LLM provider for local testing"),
+    db: Session = Depends(get_db),
+):
+    selection = db.query(Selection).filter_by(id=payload.selection_id).first()
+    if not selection:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Selection '{payload.selection_id}' not found",
+        )
+
+    if not selection.pinned_nodes:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Selection '{payload.selection_id}' has no pinned nodes",
+        )
+
+    generator = QAGeneratorService(mock_mode=mock_mode)
+    try:
+        record = generator.generate_for_selection(
+            selection=selection,
+            db=db,
+            force_regenerate=payload.force_regenerate,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"QA Generation failed: {str(e)}")
+
+    # Return generation enriched with initial staleness status
+    return evaluate_staleness(record, db)
+
+
+@app.get(
+    "/generations",
+    response_model=List[GenerationRetrievalResponse],
+    summary="Retrieve generated test cases with real-time staleness evaluation against latest document version",
+)
+def list_generations(
+    selection_id: Optional[str] = Query(None, description="Filter by selection ID"),
+    node_id: Optional[str] = Query(None, description="Filter by source node ID"),
+    generation_id: Optional[str] = Query(None, description="Filter by generation ID"),
+    db: Session = Depends(get_db),
+):
+    records = storage.find_generations(
+        selection_id=selection_id,
+        node_id=node_id,
+        generation_id=generation_id,
+    )
+
+    results: List[GenerationRetrievalResponse] = []
+    for rec in records:
+        try:
+            report = evaluate_staleness(rec, db)
+            results.append(report)
+        except Exception as e:
+            # If document versions not available
+            continue
+
+    return results
+
+
+@app.get(
+    "/generations/{generation_id}",
+    response_model=GenerationRetrievalResponse,
+    summary="Retrieve a specific generation and evaluate its staleness against latest version",
+)
+def get_generation_by_id(
+    generation_id: str,
+    db: Session = Depends(get_db),
+):
+    records = storage.find_generations(generation_id=generation_id)
+    if not records:
+        raise HTTPException(status_code=404, detail=f"Generation '{generation_id}' not found")
+
+    return evaluate_staleness(records[0], db)
+

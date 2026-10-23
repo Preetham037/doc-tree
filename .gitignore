@@ -25,3 +25,5 @@ Thumbs.db
 # Output and logs
 *.log
 scratch/
+data/generated_cases_fallback.json
+data/*.json
