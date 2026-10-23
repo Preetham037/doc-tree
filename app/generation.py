@@ -28,7 +28,7 @@ JSON_FALLBACK_FILE = os.path.join("data", "generated_cases_fallback.json")
 
 # LLM provider configuration (Groq default or OpenAI compatible)
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b")
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 
