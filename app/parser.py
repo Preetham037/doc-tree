@@ -377,6 +377,21 @@ class CT200Parser:
             warnings=doc_warnings,
         )
 
+    def _join_body_blocks(self, blocks: List[str]) -> str:
+        if not blocks:
+            return ""
+        cleaned_blocks = [b.strip() for b in blocks if b.strip()]
+        if not cleaned_blocks:
+            return ""
+        joined = cleaned_blocks[0]
+        for b in cleaned_blocks[1:]:
+            # If the next block is a numbered list item, preserve paragraph break
+            if re.match(r"^\d+\.\s+", b):
+                joined = joined.rstrip() + "\n\n" + b.lstrip()
+            else:
+                joined = joined.rstrip() + " " + b.lstrip()
+        return joined.strip()
+
     def _build_hierarchy(
         self, raw_sections: List[Dict[str, Any]], document_key: str
     ) -> List[ParsedNode]:
@@ -450,8 +465,8 @@ class CT200Parser:
                 section_map[sec_num] = logical_id
                 previous_sec_nums.append(sec_num)
 
-            # Combine and clean body text
-            body_text = "\n\n".join(sec["body_lines"]).strip()
+            # Combine body text, joining cross-page sentences seamlessly
+            body_text = self._join_body_blocks(sec["body_lines"])
 
             # Check for technical discrepancies (Page 4 v2 E3 discrepancy between table and body)
             if sec_num == "4.1":
